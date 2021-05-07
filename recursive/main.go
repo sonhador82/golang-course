@@ -8,40 +8,87 @@ import (
 )
 
 // ├───project
+// │	├───file.txt (19b)
+// │	└───gopher.png (70372b)
 // ├───static
 // │	├───a_lorem
-// │		├───a_lorem
+// │	│	├───dolor.txt (empty)
+// │	│	├───gopher.png (70372b)
+// │	│	└───ipsum
+// │	│		└───gopher.png (70372b)
 // │	├───css
+// │	│	└───body.css (28b)
+// │	├───empty.txt (empty)
 // │	├───html
+// │	│	└───index.html (57b)
 // │	├───js
+// │	│	└───site.js (10b)
+// │	└───z_lorem
+// │		├───dolor.txt (empty)
+// │		├───gopher.png (70372b)
+// │		└───ipsum
+// │			└───gopher.png (70372b)
+// ├───zline
+// │	├───empty.txt (empty)
+// │	└───lorem
+// │		├───dolor.txt (empty)
+// │		├───gopher.png (70372b)
+// │		└───ipsum
+// │			└───gopher.png (70372b)
+// └───zzfile.txt (empty)
 
-func recursive(parent string, level int) {
+type levelInfo struct {
+	currIdx     int
+	dirIdxLast  int
+	fileIdxLast int
+}
+
+func recursive(parent string, level int, finLevels *map[int]levelInfo) {
 	files, err := os.ReadDir(parent)
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, item := range files {
-		fullPath := filepath.Join(parent, item.Name())
-		var numTabs string
-		for i := 0; i < level; i++ {
-			numTabs += "\t"
+
+	newFinLevels := *finLevels
+	curLevelInfo := newFinLevels[level]
+
+	// sort filelist
+	for idx, item := range files {
+		if item.IsDir() {
+			curLevelInfo.dirIdxLast = idx
 		}
-		prefix := "├───"
-		fmt.Println(numTabs + prefix + item.Name())
-		//fmt.Println(level)
-		level++
-		recursive(fullPath, level)
-		level--
+		curLevelInfo.fileIdxLast = idx
 	}
 
-	//fmt.Println(files)
+	lastPrefix := "└───"
 
-	// if idx == 0 {
-	// 	return
-	// }
-	// idx--
-	//fmt.Println(idx)
-	//recursive(idx)
+	//fmt.Println(curLevelInfo)
+	for idx, item := range files {
+		curLevelInfo.currIdx = idx
+		newFinLevels[level] = curLevelInfo
+		prefix := "├───"
+		if idx == curLevelInfo.fileIdxLast {
+			prefix = lastPrefix
+		}
+
+		var tabPrefix string
+		for i := 0; i < level; i++ {
+			if newFinLevels[i].currIdx == newFinLevels[i].fileIdxLast {
+				tabPrefix += "\t"
+			} else {
+				tabPrefix += "│\t"
+			}
+		}
+
+		if item.IsDir() {
+			fmt.Printf("%s%s%s\n", tabPrefix, prefix, item.Name())
+			fullPath := filepath.Join(parent, item.Name())
+			recursive(fullPath, level+1, &newFinLevels)
+		} else {
+			fmt.Printf("%s%s%s\n", tabPrefix, prefix, item.Name())
+		}
+
+	}
 }
 
 func runme(dir string) {
@@ -61,7 +108,6 @@ func mapme() {
 }
 
 func main() {
-	fmt.Println("JHe")
-	//recursive("/home/demo/go/src/hw1_tree/testdata", 0)
-	mapme()
+	finLevels := map[int]levelInfo{}
+	recursive("/home/demo/go/src/hw1_tree/testdata", 0, &finLevels)
 }

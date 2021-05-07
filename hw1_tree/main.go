@@ -8,91 +8,76 @@ import (
 	"path/filepath"
 )
 
-func recursive(parent string, dirData *map[int][]os.DirEntry, level int) {
-	files, err := os.ReadDir(parent)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, item := range files {
-		if item.IsDir() {
-			fullPath := filepath.Join(parent, item.Name())
-			//fmt.Println(numTabs + prefix + item.Name())
-			//fmt.Println(level)
-			curMap := *dirData
-			//fmt.Println(curMap[level])
-			curMap[level] = append(curMap[level], item)
-			//&dirData[level] := append(&dirData[level], item)
-			level++
-			recursive(fullPath, &curMap, level)
-			level--
-		}
-	}
+type levelInfo struct {
+	currIdx     int
+	dirIdxLast  int
+	fileIdxLast int
 }
 
-// ├───project
-// ├───static
-// │	├───a_lorem
-// │	|   ├───a_lorem
-// │	│	└───ipsum
-// │	├───css
-// │	├───html
-// │	├───js
-// │	└───z_lorem
-// │		└───ipsum
-// └───zline
-// 	└───lorem
-// 		└───ipsum
-
-func recursive2(parent string) string {
+func recursive(parent string, level int, finLevels *map[int]levelInfo) {
 	files, err := os.ReadDir(parent)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var name string
+	newFinLevels := *finLevels
+	curLevelInfo := newFinLevels[level]
 
-	for _, item := range files {
+	// sort filelist
+	for idx, item := range files {
 		if item.IsDir() {
-			fullPath := filepath.Join(parent, item.Name())
-			fmt.Println(fullPath)
-			name = recursive2(fullPath)
-
+			curLevelInfo.dirIdxLast = idx
 		}
+		curLevelInfo.fileIdxLast = idx
 	}
-	return name
+
+	lastPrefix := "└───"
+
+	//fmt.Println(curLevelInfo)
+	for idx, item := range files {
+		curLevelInfo.currIdx = idx
+		newFinLevels[level] = curLevelInfo
+		prefix := "├───"
+		if idx == curLevelInfo.fileIdxLast {
+			prefix = lastPrefix
+		}
+
+		var tabPrefix string
+		for i := 0; i < level; i++ {
+			if newFinLevels[i].currIdx == newFinLevels[i].fileIdxLast {
+				tabPrefix += "\t"
+			} else {
+				tabPrefix += "│\t"
+			}
+		}
+
+		if item.IsDir() {
+			fmt.Printf("%s%s%s\n", tabPrefix, prefix, item.Name())
+			fullPath := filepath.Join(parent, item.Name())
+			recursive(fullPath, level+1, &newFinLevels)
+		} else {
+			info, err := item.Info()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			var sizeInfo string
+			if info.Size() > 0 {
+				sizeInfo = fmt.Sprintf("%vb", info.Size())
+			} else {
+				sizeInfo = "empty"
+			}
+
+			fmt.Printf("%s%s%s (%s)\n", tabPrefix, prefix, item.Name(), sizeInfo)
+		}
+
+	}
 }
 
 func dirTree(out io.Writer, path string, printFiles bool) error {
-	test := recursive2(path)
-	fmt.Println(test)
+	finLevels := map[int]levelInfo{}
+	recursive(path, 0, &finLevels)
 	return nil
 
-	dirData := map[int][]os.DirEntry{}
-
-	recursive(path, &dirData, 0)
-
-	for i := 0; i < len(dirData); i++ {
-		//fmt.Println(i)
-		var numTabs string
-		for j := 0; j < i; j++ {
-			numTabs += "\t"
-		}
-		prefix := "├───"
-
-		numFiles := len(dirData[i]) - 1
-		for kIdx, v := range dirData[i] {
-			if kIdx == numFiles {
-				prefix = "└───"
-			}
-			fmt.Fprintln(out, numTabs+prefix+v.Name())
-		}
-	}
-	// for _, v := range dirData {
-	// 	for _, item := range v {
-	// 		//fmt.Println(item)
-	// 	}
-	// }
-	return nil
 }
 
 func main() {

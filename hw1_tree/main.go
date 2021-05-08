@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 type levelInfo struct {
@@ -24,6 +25,8 @@ func recursiveDir(parent string, level int, finLevels *map[int]levelInfo, out *i
 	curLevelInfo := newFinLevels[level]
 
 	// sort filelist
+	sort.SliceStable(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
+
 	for idx, item := range files {
 		if item.IsDir() {
 			curLevelInfo.dirIdxLast = idx

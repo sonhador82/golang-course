@@ -14,7 +14,51 @@ type levelInfo struct {
 	fileIdxLast int
 }
 
-func recursive(parent string, level int, finLevels *map[int]levelInfo) {
+func recursiveDir(parent string, level int, finLevels *map[int]levelInfo, out *io.Writer) {
+	files, err := os.ReadDir(parent)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	newFinLevels := *finLevels
+	curLevelInfo := newFinLevels[level]
+
+	// sort filelist
+	for idx, item := range files {
+		if item.IsDir() {
+			curLevelInfo.dirIdxLast = idx
+		}
+		curLevelInfo.fileIdxLast = idx
+	}
+
+	lastPrefix := "└───"
+
+	for idx, item := range files {
+		curLevelInfo.currIdx = idx
+		newFinLevels[level] = curLevelInfo
+		prefix := "├───"
+		if idx == curLevelInfo.dirIdxLast {
+			prefix = lastPrefix
+		}
+
+		var tabPrefix string
+		for i := 0; i < level; i++ {
+			if newFinLevels[i].currIdx == newFinLevels[i].dirIdxLast {
+				tabPrefix += "\t"
+			} else {
+				tabPrefix += "│\t"
+			}
+		}
+
+		if item.IsDir() {
+			fmt.Fprintf(*out, "%s%s%s\n", tabPrefix, prefix, item.Name())
+			fullPath := filepath.Join(parent, item.Name())
+			recursiveDir(fullPath, level+1, &newFinLevels, out)
+		}
+	}
+}
+
+func recursive(parent string, level int, finLevels *map[int]levelInfo, out *io.Writer) {
 	files, err := os.ReadDir(parent)
 	if err != nil {
 		log.Fatal(err)
@@ -41,7 +85,6 @@ func recursive(parent string, level int, finLevels *map[int]levelInfo) {
 		if idx == curLevelInfo.fileIdxLast {
 			prefix = lastPrefix
 		}
-
 		var tabPrefix string
 		for i := 0; i < level; i++ {
 			if newFinLevels[i].currIdx == newFinLevels[i].fileIdxLast {
@@ -52,9 +95,9 @@ func recursive(parent string, level int, finLevels *map[int]levelInfo) {
 		}
 
 		if item.IsDir() {
-			fmt.Printf("%s%s%s\n", tabPrefix, prefix, item.Name())
+			fmt.Fprintf(*out, "%s%s%s\n", tabPrefix, prefix, item.Name())
 			fullPath := filepath.Join(parent, item.Name())
-			recursive(fullPath, level+1, &newFinLevels)
+			recursive(fullPath, level+1, &newFinLevels, out)
 		} else {
 			info, err := item.Info()
 			if err != nil {
@@ -66,8 +109,7 @@ func recursive(parent string, level int, finLevels *map[int]levelInfo) {
 			} else {
 				sizeInfo = "empty"
 			}
-
-			fmt.Printf("%s%s%s (%s)\n", tabPrefix, prefix, item.Name(), sizeInfo)
+			fmt.Fprintf(*out, "%s%s%s (%s)\n", tabPrefix, prefix, item.Name(), sizeInfo)
 		}
 
 	}
@@ -75,7 +117,11 @@ func recursive(parent string, level int, finLevels *map[int]levelInfo) {
 
 func dirTree(out io.Writer, path string, printFiles bool) error {
 	finLevels := map[int]levelInfo{}
-	recursive(path, 0, &finLevels)
+	if printFiles {
+		recursive(path, 0, &finLevels, &out)
+	} else {
+		recursiveDir(path, 0, &finLevels, &out)
+	}
 	return nil
 
 }
